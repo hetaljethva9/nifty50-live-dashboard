@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nifty 50 — Live Opening Range Dashboard</title>
+<style>
+  :root {
+    --bg: #0f1115; --panel: #171a21; --border: #262b36;
+    --text: #e6e8ec; --muted: #8b93a3;
+    --up: #22c55e; --down: #ef4444; --accent: #3b82f6; --warn: #f59e0b;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg); color: var(--text); padding: 24px 20px 64px;
+  }
+  .wrap { max-width: 1100px; margin: 0 auto; }
+  header { display: flex; justify-content: space-between; align-items: flex-start;
+    flex-wrap: wrap; gap: 12px; margin-bottom: 20px; }
+  h1 { font-size: 21px; margin: 0 0 4px; }
+  .subtitle { color: var(--muted); font-size: 13px; margin: 0; }
+  .status-bar {
+    display: flex; align-items: center; gap: 14px; font-size: 12.5px;
+    color: var(--muted); background: var(--panel); border: 1px solid var(--border);
+    border-radius: 10px; padding: 10px 16px;
+  }
+  .live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--up);
+    animation: pulse 1.6s infinite; }
+  .live-dot.closed { background: var(--muted); animation: none; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .3; } }
+  .refresh-select {
+    background: #12151b; color: var(--text); border: 1px solid var(--border);
+    border-radius: 6px; padding: 4px 8px; font-size: 12.5px;
+  }
+  #refreshBtn {
+    background: var(--accent); color: white; border: none; border-radius: 6px;
+    padding: 5px 12px; font-size: 12.5px; cursor: pointer;
+  }
+  #refreshBtn:disabled { opacity: .5; cursor: default; }
+  .summary { display: flex; gap: 12px; margin-bottom: 24px; flex-wrap: wrap; }
+  .summary-card {
+    flex: 1; min-width: 140px; background: var(--panel); border: 1px solid var(--border);
+    border-radius: 10px; padding: 14px 16px;
+  }
+  .summary-card .num { font-size: 24px; font-weight: 700; }
+  .summary-card .label { color: var(--muted); font-size: 12px; margin-top: 2px; }
+  .summary-card.up .num { color: var(--up); }
+  .summary-card.down .num { color: var(--down); }
+  .section { margin-bottom: 32px; }
+  .section-title { display: flex; align-items: center; gap: 8px; font-size: 15px;
+    font-weight: 600; margin-bottom: 10px; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; }
+  .dot.up { background: var(--up); } .dot.down { background: var(--down); }
+  table { width: 100%; border-collapse: collapse; background: var(--panel);
+    border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+  th, td { padding: 9px 14px; text-align: right; font-size: 13px;
+    border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 500; text-transform: uppercase;
+    font-size: 10.5px; letter-spacing: .04em; background: #12151b; }
+  th:first-child, td.sym { text-align: left; }
+  td.sym { font-weight: 600; }
+  tr:last-child td { border-bottom: none; }
+  .pct-up { color: var(--up); font-weight: 600; }
+  .pct-down { color: var(--down); font-weight: 600; }
+  .badge { display: inline-block; background: var(--accent); color: white;
+    font-size: 11px; padding: 2px 8px; border-radius: 20px; }
+  .flag { font-size: 10.5px; padding: 1px 6px; border-radius: 4px; margin-left: 6px; }
+  .flag.confirmed { background: rgba(34,197,94,.15); color: var(--up); }
+  .flag.confirmed.down { background: rgba(239,68,68,.15); color: var(--down); }
+  .empty { text-align: center; color: var(--muted); padding: 18px; }
+  .footer-note { color: var(--muted); font-size: 12px; margin-top: 20px; line-height: 1.6; }
+  .error-box { background: rgba(239,68,68,.1); border: 1px solid var(--down);
+    color: #fca5a5; padding: 12px 16px; border-radius: 8px; font-size: 13px; margin-bottom: 20px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Nifty 50 — Live Opening Range Dashboard</h1>
+      <p class="subtitle" id="subtitle">Loading...</p>
+    </div>
+    <div class="status-bar">
+      <span class="live-dot" id="liveDot"></span>
+      <span id="statusText">connecting...</span>
+      <label>Refresh every
+        <select class="refresh-select" id="intervalSelect">
+          <option value="60">1 min</option>
+          <option value="120">2 min</option>
+          <option value="300" selected>5 min</option>
+        </select>
+      </label>
+      <button id="refreshBtn">Refresh now</button>
+    </div>
+  </header>
+
+  <div id="errorBox"></div>
+
+  <div class="summary" id="summary"></div>
+
+  <div class="section">
+    <div class="section-title"><span class="dot up"></span>Currently Above Candle 1 High (Bullish)
+      <span class="badge" id="bullishCount">0</span></div>
+    <table>
+      <thead><tr><th>Symbol</th><th>C1 High</th><th>C1 Low</th><th>Current Price</th><th>Move</th><th>Last Candle</th></tr></thead>
+      <tbody id="bullishBody"></tbody>
+    </table>
+  </div>
+
+  <div class="section">
+    <div class="section-title"><span class="dot down"></span>Currently Below Candle 1 Low (Bearish)
+      <span class="badge" id="bearishCount">0</span></div>
+    <table>
+      <thead><tr><th>Symbol</th><th>C1 High</th><th>C1 Low</th><th>Current Price</th><th>Move</th><th>Last Candle</th></tr></thead>
+      <tbody id="bearishBody"></tbody>
+    </table>
+  </div>
+
+  <p class="footer-note">
+    "Move" = % distance of current price beyond the Candle-1 range.
+    A <span class="flag confirmed">confirmed</span> flag means the original
+    fixed signal also fired (Candle 2 crossed Candle 1's high/low). Data via
+    Yahoo Finance — typically ~15 min delayed, not tick-level. Auto-refreshes
+    on the interval selected above while this tab is open.
+  </p>
+</div>
+
+<script>
+  let timer = null;
+  let refreshing = false;
+
+  function fmtPct(p) { return (p >= 0 ? '+' : '') + p.toFixed(2) + '%'; }
+
+  function rowHtml(r, direction) {
+    const pctClass = direction === 'up' ? 'pct-up' : 'pct-down';
+    const sign = direction === 'up' ? '+' : '-';
+    let flag = '';
+    const confirmedAt = r.confirmed_at ? ` @ ${r.confirmed_at}` : '';
+    if (direction === 'up' && r.candle2_signal === 'bullish_cross') {
+      flag = `<span class="flag confirmed">confirmed${confirmedAt}</span>`;
+    } else if (direction === 'down' && r.candle2_signal === 'bearish_cross') {
+      flag = `<span class="flag confirmed down">confirmed${confirmedAt}</span>`;
+    }
+    return `<tr>
+      <td class="sym">${r.symbol} ${flag}</td>
+      <td>${r.c1_high.toFixed(2)}</td>
+      <td>${r.c1_low.toFixed(2)}</td>
+      <td>${r.current_price.toFixed(2)}</td>
+      <td class="${pctClass}">${sign}${r.pct.toFixed(2)}%</td>
+      <td>${r.last_candle_time}</td>
+    </tr>`;
+  }
+
+  async function refresh() {
+    if (refreshing) return;
+    refreshing = true;
+    const btn = document.getElementById('refreshBtn');
+    btn.disabled = true;
+    btn.textContent = 'Refreshing...';
+
+    try {
+      const res = await fetch('/api/status', { cache: 'no-store' });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const data = await res.json();
+      render(data);
+      document.getElementById('errorBox').innerHTML = '';
+    } catch (err) {
+      document.getElementById('errorBox').innerHTML =
+        `<div class="error-box">Couldn't refresh data: ${err.message}. Will retry on next cycle.</div>`;
+    } finally {
+      refreshing = false;
+      btn.disabled = false;
+      btn.textContent = 'Refresh now';
+    }
+  }
+
+  function render(data) {
+    document.getElementById('subtitle').textContent =
+      `Last updated ${data.generated_at} · tracking ${data.total_tracked} stocks` +
+      (data.skipped.length ? ` · ${data.skipped.length} skipped` : '');
+
+    const dot = document.getElementById('liveDot');
+    const statusText = document.getElementById('statusText');
+    if (data.market_open) {
+      dot.classList.remove('closed');
+      statusText.textContent = 'Market open — live';
+    } else {
+      dot.classList.add('closed');
+      statusText.textContent = 'Market closed — showing last available data';
+    }
+
+    document.getElementById('summary').innerHTML = `
+      <div class="summary-card up"><div class="num">${data.bullish.length}</div><div class="label">Bullish (above C1 high)</div></div>
+      <div class="summary-card down"><div class="num">${data.bearish.length}</div><div class="label">Bearish (below C1 low)</div></div>
+      <div class="summary-card"><div class="num">${data.inside_count}</div><div class="label">Inside opening range</div></div>
+    `;
+
+    document.getElementById('bullishCount').textContent = data.bullish.length;
+    document.getElementById('bearishCount').textContent = data.bearish.length;
+
+    document.getElementById('bullishBody').innerHTML = data.bullish.length
+      ? data.bullish.map(r => rowHtml(r, 'up')).join('')
+      : '<tr><td colspan="6" class="empty">No stocks currently above their opening range high</td></tr>';
+
+    document.getElementById('bearishBody').innerHTML = data.bearish.length
+      ? data.bearish.map(r => rowHtml(r, 'down')).join('')
+      : '<tr><td colspan="6" class="empty">No stocks currently below their opening range low</td></tr>';
+  }
+
+  function scheduleTimer() {
+    if (timer) clearInterval(timer);
+    const seconds = parseInt(document.getElementById('intervalSelect').value, 10);
+    timer = setInterval(refresh, seconds * 1000);
+  }
+
+  document.getElementById('refreshBtn').addEventListener('click', refresh);
+  document.getElementById('intervalSelect').addEventListener('change', scheduleTimer);
+
+  refresh();
+  scheduleTimer();
+</script>
+</body>
+</html>
