@@ -72,7 +72,6 @@
   .flag.st-down { background: rgba(239,68,68,.15); color: var(--down); }
   .flag.valid-entry { background: rgba(34,197,94,.2); color: var(--up); font-weight: 700; }
   .flag.too-early { background: rgba(245,158,11,.15); color: var(--warn); }
-  .flag.not-aligned { background: rgba(139,147,163,.15); color: var(--muted); }
   tr.valid-entry-row { background: rgba(34,197,94,.06); }
   .strategy-banner { display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
     background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
@@ -152,24 +151,22 @@
     <br><br>
     <strong>Supertrend Flips Today</strong> table = every Supertrend
     direction change (period 10, multiplier 3, standard settings) that has
-    occurred so far today on each stock's 5-min chart, most recent first.
-    ATR is warmed up using several days of history, so flips can show up
-    even in the first candles right after market open. A stock can appear
-    more than once if it flipped several times during the day.
+    occurred so far today on each stock's 5-min chart, most recent first,
+    filtered to only those aligned with the stock's current 15-min bias
+    (counter-trend flips are left out entirely). A stock can appear more
+    than once if it flipped several times during the day.
     <br><br>
     <strong>Dual-timeframe strategy signal:</strong> each stock's current
     15-min Supertrend (10, 3) is shown as its "15-Min Bias." A flip gets
-    <span class="flag valid-entry">Valid Entry</span> only when its
-    direction matches that 15-min bias AND it happened at/after 09:45 IST
-    (per the strategy: don't act before the first 15-min candle closes).
+    <span class="flag valid-entry">Valid Entry</span> when its direction
+    matches that 15-min bias AND it happened at/after 09:45 IST (per the
+    strategy: don't act before the first 15-min candle closes).
     <span class="flag too-early">Aligned, too early</span> means it
-    matches the 15-min bias but fired before 09:45.
-    <span class="flag not-aligned">Not aligned</span> means it's against
-    the 15-min trend — the kind of move the strategy says to ignore. This
-    reflects the Supertrend confirmation logic only; it doesn't replicate
-    the original strategy's Open Interest checks, strike selection, or
-    hedge sizing, since those apply to NIFTY/SENSEX index options and
-    require options-chain data this dashboard doesn't have.
+    matches the 15-min bias but fired before 09:45. This reflects the
+    Supertrend confirmation logic only; it doesn't replicate the original
+    strategy's Open Interest checks, strike selection, or hedge sizing,
+    since those apply to NIFTY/SENSEX index options and require
+    options-chain data this dashboard doesn't have.
   </p>
 </div>
 
@@ -205,13 +202,11 @@
     const flagClass = isUp ? 'st-up' : 'st-down';
     const arrow = isUp ? '▲' : '▼';
 
-    let sigHtml = '<span class="flag not-aligned">Not aligned</span>';
+    let sigHtml = '<span class="flag too-early">Aligned, too early</span>';
     let rowClass = '';
     if (r.strategy_signal === 'valid_entry') {
       sigHtml = '<span class="flag valid-entry">✓ Valid Entry</span>';
       rowClass = ' class="valid-entry-row"';
-    } else if (r.strategy_signal === 'aligned_too_early') {
-      sigHtml = '<span class="flag too-early">Aligned, too early</span>';
     }
 
     const biasText = r.trend_15m ? r.trend_15m : '—';
@@ -286,7 +281,7 @@
 
     document.getElementById('supertrendBody').innerHTML = data.supertrend_flips.length
       ? data.supertrend_flips.map(r => supertrendRowHtml(r)).join('')
-      : '<tr><td colspan="7" class="empty">No Supertrend flips yet today</td></tr>';
+      : '<tr><td colspan="7" class="empty">No 15-min-aligned Supertrend flips yet today</td></tr>';
 
     const sc = data.strategy_context;
     if (sc) {
